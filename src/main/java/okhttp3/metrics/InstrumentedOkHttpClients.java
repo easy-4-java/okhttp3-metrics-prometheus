@@ -18,18 +18,18 @@ import java.util.function.BiFunction;
 public final class InstrumentedOkHttpClients {
 
   public static OkHttpClient create(MeterRegistry registry) {
-    return new InstrumentedOkHttpClient(registry, new OkHttpClient(), Collections.emptyMap(), Collections.emptyList(), Collections.emptyList(), UrlMapperEnum.ENCODED_PATH, false);
+    return InstrumentedOkHttpClient.create(registry, new OkHttpClient(), Collections.emptyMap(), Collections.emptyList(), Collections.emptyList(), UrlMapperEnum.ENCODED_PATH, false);
   }
 
   public static OkHttpClient create(MeterRegistry registry,
                                     OkHttpClient client) {
-    return new InstrumentedOkHttpClient(registry, client, Collections.emptyMap(), Collections.emptyList(), Collections.emptyList(), UrlMapperEnum.ENCODED_PATH, false);
+    return InstrumentedOkHttpClient.create(registry, client, Collections.emptyMap(), Collections.emptyList(), Collections.emptyList(), UrlMapperEnum.ENCODED_PATH, false);
   }
 
   public static OkHttpClient create(MeterRegistry registry,
                                     OkHttpClient client,
                                     boolean includeHostTag) {
-    return new InstrumentedOkHttpClient(registry, client, Collections.emptyMap(), Collections.emptyList(), Collections.emptyList(), UrlMapperEnum.ENCODED_PATH, includeHostTag);
+    return InstrumentedOkHttpClient.create(registry, client, Collections.emptyMap(), Collections.emptyList(), Collections.emptyList(), UrlMapperEnum.ENCODED_PATH, includeHostTag);
   }
 
 
@@ -37,7 +37,7 @@ public final class InstrumentedOkHttpClients {
                                     OkHttpClient client,
                                     UrlMapperEnum urlMapper,
                                     boolean includeHostTag) {
-    return new InstrumentedOkHttpClient(registry, client, Collections.emptyMap(), Collections.emptyList(), Collections.emptyList(), urlMapper, includeHostTag);
+    return InstrumentedOkHttpClient.create(registry, client, Collections.emptyMap(), Collections.emptyList(), Collections.emptyList(), urlMapper, includeHostTag);
   }
 
   public static OkHttpClient create(MeterRegistry registry,
@@ -45,7 +45,7 @@ public final class InstrumentedOkHttpClients {
                                     List<BiFunction<Request, Response, KeyValue>> contextSpecificTags,
                                     UrlMapperEnum urlMapper,
                                     boolean includeHostTag) {
-    return new InstrumentedOkHttpClient(registry, client, Collections.emptyMap(), Collections.emptyList(), contextSpecificTags, urlMapper, includeHostTag);
+    return InstrumentedOkHttpClient.create(registry, client, Collections.emptyMap(), Collections.emptyList(), contextSpecificTags, urlMapper, includeHostTag);
   }
 
   public static OkHttpClient create(MeterRegistry registry,
@@ -55,7 +55,7 @@ public final class InstrumentedOkHttpClients {
                                     List<BiFunction<Request, Response, KeyValue>> contextSpecificTags,
                                     UrlMapperEnum urlMapper,
                                     boolean includeHostTag) {
-    return new InstrumentedOkHttpClient(registry, client, extraTagMap, requestTagKeys, contextSpecificTags, urlMapper, includeHostTag);
+    return InstrumentedOkHttpClient.create(registry, client, extraTagMap, requestTagKeys, contextSpecificTags, urlMapper, includeHostTag);
   }
 
   private InstrumentedOkHttpClients() {
