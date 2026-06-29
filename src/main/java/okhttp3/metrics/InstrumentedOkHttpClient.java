@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package okhttp3.spring.boot.metrics;
+package okhttp3.metrics;
 
 import io.micrometer.common.KeyValue;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -24,7 +24,6 @@ import io.micrometer.core.instrument.binder.okhttp3.OkHttpObservationConvention;
 import io.micrometer.core.instrument.binder.okhttp3.OkHttpObservationInterceptor;
 import io.micrometer.observation.ObservationRegistry;
 import okhttp3.*;
-import org.springframework.util.CollectionUtils;
 
 import javax.net.SocketFactory;
 import javax.net.ssl.HostnameVerifier;
@@ -65,12 +64,12 @@ final class InstrumentedOkHttpClient extends OkHttpClient {
                            boolean includeHostTag) {
     this.rawClient = rawClient;
     this.registry = registry;
-    this.extraTags = CollectionUtils.isEmpty(extraTagMap) ? new ArrayList<>()  : extraTagMap
+    this.extraTags = (extraTagMap == null || extraTagMap.isEmpty()) ? new ArrayList<>()  : extraTagMap
             .entrySet().stream().map(e -> Tag.of(e.getKey(), e.getValue())).collect(Collectors.toList());
-    this.kvTags = CollectionUtils.isEmpty(extraTagMap) ? new ArrayList<>() : extraTagMap
+    this.kvTags = (extraTagMap == null || extraTagMap.isEmpty()) ? new ArrayList<>() : extraTagMap
             .entrySet().stream().map(e -> KeyValue.of(e.getKey(), e.getValue())).collect(Collectors.toList());
     this.contextSpecificTags = contextSpecificTags;
-    this.requestTagKeys = CollectionUtils.isEmpty(requestTagKeys) ? new ArrayList<>() : requestTagKeys;
+    this.requestTagKeys = (requestTagKeys == null || requestTagKeys.isEmpty()) ? new ArrayList<>() : requestTagKeys;
     this.urlMapper = urlMapper;
     this.includeHostTag = includeHostTag;
     instrumentNetworkRequests();

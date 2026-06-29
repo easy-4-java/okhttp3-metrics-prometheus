@@ -1,4 +1,4 @@
-package okhttp3.spring.boot.metrics;
+package okhttp3.metrics;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -7,7 +7,6 @@ import io.micrometer.core.instrument.Timer;
 import okhttp3.Interceptor;
 import okhttp3.Request;
 import okhttp3.Response;
-import org.springframework.core.annotation.Order;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -18,7 +17,6 @@ import java.util.concurrent.TimeUnit;
  * An {@link Interceptor} that monitors the number of submitted, running, and completed network
  * requests. Also, keeps a {@link Timer} for the request duration.
  */
-@Order(Integer.MIN_VALUE)
 public class InstrumentedInterceptor implements Interceptor {
 
     /**

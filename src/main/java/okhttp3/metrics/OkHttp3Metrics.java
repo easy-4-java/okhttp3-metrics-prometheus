@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package okhttp3.spring.boot.metrics;
+package okhttp3.metrics;
 
 import io.micrometer.common.lang.NonNull;
 import io.micrometer.core.instrument.*;
@@ -22,8 +22,6 @@ import okhttp3.Cache;
 import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
 import okhttp3.OkHttpClient;
-import org.springframework.boot.context.event.ApplicationStartedEvent;
-import org.springframework.context.ApplicationListener;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -34,7 +32,7 @@ import java.util.function.ToLongFunction;
 /**
  * OkHttp3 Metrics
  */
-public abstract class OkHttp3Metrics implements MeterBinder, ApplicationListener<ApplicationStartedEvent> {
+public abstract class OkHttp3Metrics implements MeterBinder {
 
 	/**
 	 * Prefix used for all OkHttp3 metric names.
@@ -112,11 +110,6 @@ public abstract class OkHttp3Metrics implements MeterBinder, ApplicationListener
 		this.okhttp3Client = okhttp3Client;
 		this.namePrefix = namePrefix;
 		this.tags = tags;
-	}
-
-	@Override
-	public void onApplicationEvent(ApplicationStartedEvent event) {
-		this.bindTo(event.getApplicationContext().getBean(MeterRegistry.class));
 	}
 
 	@Override
