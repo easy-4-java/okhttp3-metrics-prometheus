@@ -23,13 +23,10 @@ import io.micrometer.core.instrument.binder.okhttp3.OkHttpMetricsEventListener;
 import io.micrometer.core.instrument.binder.okhttp3.OkHttpObservationConvention;
 import io.micrometer.core.instrument.binder.okhttp3.OkHttpObservationInterceptor;
 import io.micrometer.observation.ObservationRegistry;
-import okhttp3.*;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
-import javax.net.SocketFactory;
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.SSLSocketFactory;
-import java.net.Proxy;
-import java.net.ProxySelector;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -37,229 +34,71 @@ import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
-/** Wraps an {@link OkHttpClient} in order to provide data about its internals. */
-final class InstrumentedOkHttpClient extends OkHttpClient {
+/**
+ * Builds an instrumented {@link OkHttpClient} with metrics interceptors and event listeners.
+ * Uses composition (builder pattern) instead of inheritance to avoid Kotlin final method issues on JDK 9+.
+ */
+final class InstrumentedOkHttpClient {
 
-  private final MeterRegistry registry;
-  private OkHttpClient rawClient;
-
-  private Collection<Tag> extraTags;
-
-  private Collection<KeyValue> kvTags;
-
-  List<BiFunction<Request, Response, KeyValue>> contextSpecificTags;
-
-  List<String> requestTagKeys;
-
-  UrlMapperEnum urlMapper;
-
-  boolean includeHostTag;
-
-  InstrumentedOkHttpClient(MeterRegistry registry,
-                           OkHttpClient rawClient,
-                           Map<String, String > extraTagMap,
-                           List<String> requestTagKeys,
-                           List<BiFunction<Request, Response, KeyValue>> contextSpecificTags,
-                           UrlMapperEnum urlMapper,
-                           boolean includeHostTag) {
-    this.rawClient = rawClient;
-    this.registry = registry;
-    this.extraTags = (extraTagMap == null || extraTagMap.isEmpty()) ? new ArrayList<>()  : extraTagMap
-            .entrySet().stream().map(e -> Tag.of(e.getKey(), e.getValue())).collect(Collectors.toList());
-    this.kvTags = (extraTagMap == null || extraTagMap.isEmpty()) ? new ArrayList<>() : extraTagMap
-            .entrySet().stream().map(e -> KeyValue.of(e.getKey(), e.getValue())).collect(Collectors.toList());
-    this.contextSpecificTags = contextSpecificTags;
-    this.requestTagKeys = (requestTagKeys == null || requestTagKeys.isEmpty()) ? new ArrayList<>() : requestTagKeys;
-    this.urlMapper = urlMapper;
-    this.includeHostTag = includeHostTag;
-    instrumentNetworkRequests();
-    instrumentEventListener();
+  private InstrumentedOkHttpClient() {
+    // utility class
   }
 
-  private void instrumentNetworkRequests() {
+  static OkHttpClient create(MeterRegistry registry,
+                             OkHttpClient rawClient,
+                             Map<String, String> extraTagMap,
+                             List<String> requestTagKeys,
+                             List<BiFunction<Request, Response, KeyValue>> contextSpecificTags,
+                             UrlMapperEnum urlMapper,
+                             boolean includeHostTag) {
 
-    InstrumentedInterceptor metricsInterceptor = new InstrumentedInterceptor(registry, extraTags);
+    Collection<Tag> extraTags = (extraTagMap == null || extraTagMap.isEmpty())
+        ? new ArrayList<>()
+        : extraTagMap.entrySet().stream()
+            .map(e -> Tag.of(e.getKey(), e.getValue()))
+            .collect(Collectors.toList());
 
-    OkHttpObservationConvention observationConvention = new DefaultOkHttpObservationConvention(OkHttp3Metrics.OKHTTP3_METRIC_NAME_PREFIX);
+    Collection<KeyValue> kvTags = (extraTagMap == null || extraTagMap.isEmpty())
+        ? new ArrayList<>()
+        : extraTagMap.entrySet().stream()
+            .map(e -> KeyValue.of(e.getKey(), e.getValue()))
+            .collect(Collectors.toList());
 
-    OkHttpObservationInterceptor observationInterceptor = new OkHttpObservationInterceptor(
-            ObservationRegistry.create(),
-            observationConvention,
-            OkHttp3Metrics.OKHTTP3_REQUEST_METRIC_NAME_PREFIX,
-            urlMapper.get(),
-            kvTags,
-            contextSpecificTags,
-            requestTagKeys,
-            includeHostTag
-    );
+    List<String> safeRequestTagKeys = (requestTagKeys == null || requestTagKeys.isEmpty())
+        ? new ArrayList<>() : requestTagKeys;
 
     OkHttpClient.Builder builder = rawClient.newBuilder();
-    builder.networkInterceptors().add(0, metricsInterceptor);
-    builder.networkInterceptors().add(1, observationInterceptor);
-    rawClient = builder.build();
+
+    // 1. Add network interceptor for metrics counters
+    InstrumentedInterceptor metricsInterceptor = new InstrumentedInterceptor(registry, extraTags);
+    builder.networkInterceptors().add(metricsInterceptor);
+
+    // 2. Add network interceptor for observation
+    OkHttpObservationConvention observationConvention =
+        new DefaultOkHttpObservationConvention(OkHttp3Metrics.OKHTTP3_METRIC_NAME_PREFIX);
+    OkHttpObservationInterceptor observationInterceptor = new OkHttpObservationInterceptor(
+        ObservationRegistry.create(),
+        observationConvention,
+        OkHttp3Metrics.OKHTTP3_REQUEST_METRIC_NAME_PREFIX,
+        urlMapper.get(),
+        kvTags,
+        contextSpecificTags,
+        safeRequestTagKeys,
+        includeHostTag
+    );
+    builder.networkInterceptors().add(observationInterceptor);
+
+    // 3. Add event listener for detailed metrics
+    OkHttpMetricsEventListener metricsEventListener = OkHttpMetricsEventListener
+        .builder(registry, OkHttp3Metrics.OKHTTP3_REQUEST_METRIC_NAME_PREFIX)
+        .tags(extraTags)
+        .requestTagKeys(safeRequestTagKeys)
+        .includeHostTag(includeHostTag)
+        .uriMapper(urlMapper.get())
+        .build();
+    builder.eventListener(new InstrumentedEventListener(registry, metricsEventListener));
+
+    return builder.build();
   }
 
-  private void instrumentEventListener() {
-
-    OkHttpMetricsEventListener metricsEventListener = OkHttpMetricsEventListener.builder(registry, OkHttp3Metrics.OKHTTP3_REQUEST_METRIC_NAME_PREFIX)
-            .tags(extraTags)
-            .requestTagKeys(requestTagKeys)
-            .includeHostTag(includeHostTag)
-            .uriMapper(urlMapper.get())
-            .build();
-
-    this.rawClient = this.rawClient
-            .newBuilder()
-            .eventListener(new InstrumentedEventListener(registry, metricsEventListener))
-            .build();
-  }
-
-
-
-  @Override
-  public Authenticator authenticator() {
-    return rawClient.authenticator();
-  }
-
-  @Override
-  public Cache cache() {
-    return rawClient.cache();
-  }
-
-  @Override
-  public CertificatePinner certificatePinner() {
-    return rawClient.certificatePinner();
-  }
-
-  @Override
-  public ConnectionPool connectionPool() {
-    return rawClient.connectionPool();
-  }
-
-  @Override
-  public List<ConnectionSpec> connectionSpecs() {
-    return rawClient.connectionSpecs();
-  }
-
-  @Override
-  public int connectTimeoutMillis() {
-    return rawClient.connectTimeoutMillis();
-  }
-
-  @Override
-  public CookieJar cookieJar() {
-    return rawClient.cookieJar();
-  }
-
-  @Override
-  public Dispatcher dispatcher() {
-    return rawClient.dispatcher();
-  }
-
-  @Override
-  public Dns dns() {
-    return rawClient.dns();
-  }
-
-  @Override
-  public boolean followRedirects() {
-    return rawClient.followRedirects();
-  }
-
-  @Override
-  public boolean followSslRedirects() {
-    return rawClient.followSslRedirects();
-  }
-
-  @Override
-  public HostnameVerifier hostnameVerifier() {
-    return rawClient.hostnameVerifier();
-  }
-
-  @Override
-  public List<Interceptor> interceptors() {
-    return rawClient.interceptors();
-  }
-
-  @Override
-  public List<Interceptor> networkInterceptors() {
-    return rawClient.networkInterceptors();
-  }
-
-  @Override
-  public Builder newBuilder() {
-    return rawClient.newBuilder();
-  }
-
-  @Override
-  public Call newCall(Request request) {
-    return rawClient.newCall(request);
-  }
-
-  @Override
-  public WebSocket newWebSocket(Request request, WebSocketListener listener) {
-    return rawClient.newWebSocket(request, listener);
-  }
-
-  @Override
-  public int pingIntervalMillis() {
-    return rawClient.pingIntervalMillis();
-  }
-
-  @Override
-  public List<Protocol> protocols() {
-    return rawClient.protocols();
-  }
-
-  @Override
-  public Proxy proxy() {
-    return rawClient.proxy();
-  }
-
-  @Override
-  public Authenticator proxyAuthenticator() {
-    return rawClient.proxyAuthenticator();
-  }
-
-  @Override
-  public ProxySelector proxySelector() {
-    return rawClient.proxySelector();
-  }
-
-  @Override
-  public int readTimeoutMillis() {
-    return rawClient.readTimeoutMillis();
-  }
-
-  @Override
-  public boolean retryOnConnectionFailure() {
-    return rawClient.retryOnConnectionFailure();
-  }
-
-  @Override
-  public SocketFactory socketFactory() {
-    return rawClient.socketFactory();
-  }
-
-  @Override
-  public SSLSocketFactory sslSocketFactory() {
-    return rawClient.sslSocketFactory();
-  }
-
-  @Override
-  public int writeTimeoutMillis() {
-    return rawClient.writeTimeoutMillis();
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    return (obj instanceof InstrumentedOkHttpClient
-            && rawClient.equals(((InstrumentedOkHttpClient) obj).rawClient))
-        || rawClient.equals(obj);
-  }
-
-  @Override
-  public String toString() {
-    return rawClient.toString();
-  }
 }
