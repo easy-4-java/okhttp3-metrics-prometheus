@@ -5,7 +5,7 @@
 
     <groupId>io.github.hiwepy</groupId>
     <artifactId>okhttp3-metrics-prometheus</artifactId>
-    <version>2.0.x-SNAPSHOT</version>
+    <version>2.0.x.20260630-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>${project.groupId}:${project.artifactId}</name>
     <description>OkHttp3 Metrics for Prometheus - independent of Spring Boot</description>
@@ -35,6 +35,31 @@
             <timezone>+8</timezone>
         </developer>
     </developers>
+
+    <distributionManagement>
+        <repository>
+            <id>2624322-release-6F6h6R</id>
+            <url>https://packages.aliyun.com/6927b116e6c3e0425dbdf60d/maven/2624322-release-6f6h6r</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <snapshotRepository>
+            <id>2624322-snapshot-3EoOv3</id>
+            <url>https://packages.aliyun.com/6927b116e6c3e0425dbdf60d/maven/2624322-snapshot-3eoov3</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+            <uniqueVersion>true</uniqueVersion>
+        </snapshotRepository>
+    </distributionManagement>
+
 
     <properties>
         <java.version>17</java.version>
