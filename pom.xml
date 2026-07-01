@@ -5,7 +5,7 @@
 
     <groupId>io.github.hiwepy</groupId>
     <artifactId>okhttp3-metrics-prometheus</artifactId>
-    <version>1.0.x.20260629-SNAPSHOT</version>
+    <version>1.0.x.20260630-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>${project.groupId}:${project.artifactId}</name>
     <description>OkHttp3 Metrics for Prometheus - independent of Spring Boot</description>
@@ -35,6 +35,7 @@
             <timezone>+8</timezone>
         </developer>
     </developers>
+
 	<distributionManagement>
 		<repository>
 			<id>2624322-release-6F6h6R</id>
