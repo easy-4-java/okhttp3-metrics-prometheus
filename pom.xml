@@ -8,7 +8,7 @@
     <version>1.0.x.20260630-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>${project.groupId}:${project.artifactId}</name>
-    <description>OkHttp3 Metrics for Prometheus - independent of Spring Boot</description>
+    <description>OkHttp3 Metrics for Prometheus - independent of Spring Boot, JDK 1.8 line</description>
     <url>https://github.com/hiwepy/${project.artifactId}</url>
 
     <licenses>
