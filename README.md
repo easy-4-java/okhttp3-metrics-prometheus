@@ -1,200 +1,215 @@
 # okhttp3-metrics-prometheus
 
-Okhttp 3.x Metrics For Prometheus
+<div align="center">
 
-### 组件简介
+**Pure Java OkHttp metrics module: Micrometer / Prometheus instrumentation for OkHttp calls, dispatcher and cache**
 
- > 基于 okhttp 3.x + micrometer 的 Prometheus 指标采集组件，用于采集 okhttp 3.x 的连接池指标数据，包括：连接池活跃连接数、连接池空闲连接数、连接池最大连接数、连接池最大空闲连接数、连接
- 
-- 参考：https://github.com/raskasa/metrics-okhttp
+![Java](https://img.shields.io/badge/Java-17-orange) ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 
-### 使用说明
+[简体中文](./README.zh-CN.md)
 
-##### 1、Spring Boot 项目添加 Maven 依赖
+[1. Project Overview](#1-project-overview) · [2. Features & Status](#2-features--status) · [3. Requirements & Compatibility](#3-requirements--compatibility) · [4. Architecture & Modules](#4-architecture--modules) · [5. Installation](#5-installation) · [6. Quick Start](#6-quick-start) · [7. Configuration](#7-configuration) · [8. Core Usage](#8-core-usage) · [9. Testing & Build](#9-testing--build) · [10. Versioning & Branches](#10-versioning--branches) · [11. Contributing & License](#11-contributing--license)
 
-``` xml
+</div>
+
+---
+
+> **Current branch**: `feature/2.0.x`<br>
+> **Version**: `2.0.x.x.20260630-SNAPSHOT`<br>
+> **JDK baseline**: 8<br>
+> **Project status**: maintenance (1.0.x line). Not yet published to Maven Central; artifacts are distributed via the Aliyun Maven repository and GitHub Releases.
+
+<a id="1-project-overview"></a>
+## 1. Project Overview
+
+### 1.1 What it is
+
+**okhttp3-metrics-prometheus** instruments OkHttp clients with Micrometer meters so that Prometheus (or any Micrometer registry backend) can scrape call lifecycle, dispatcher and cache metrics. It is a pure Java "metrics sidecar" — **independent of Spring Boot**.
+
+### 1.2 What it is not
+
+- **Not a Spring Boot starter.** Auto-configuration lives in the separate `okhttp3-spring-boot-starter` repository.
+- **Not a replacement for OkHttp.** It wraps clients via `EventListener` and `Interceptor`, without forking OkHttp.
+- **Not a logging module.** It emits metrics; logging remains SLF4J's job.
+
+### 1.3 Typical scenarios
+
+| Scenario | Recommended entry | Result |
+|---|---|---|
+| Expose HTTP call metrics to Prometheus | `InstrumentedOkHttpClients.create(registry)` | `okhttp3.calls.*` / `okhttp3.requests.*` counters, timers and histograms |
+| Instrument an existing client | `InstrumentedOkHttpClients.create(registry, client, ...)` | Same metrics without rebuilding the client |
+| Custom URL cardinality control | `UrlMapperEnum` + `create(..., urlMapper, ...)` | Control per-URL tag cardinality |
+| Add context-specific tags | `create(..., contextSpecificTags, ...)` | Extra `KeyValue` tags derived from `Request`/`Response` |
+| Event-listener composition | `NestedEventListener` | Combine this listener with your own `EventListener`s |
+
+<a id="2-features--status"></a>
+## 2. Features & Status
+
+| Capability | Status | Notes |
+|---|:---:|---|
+| Call lifecycle metrics | Available | `okhttp3.calls.started` / `calls.end` / `calls.failed` / `calls.duration` |
+| DNS metrics | Available | `okhttp3.dns.started` / `dns.end` / `dns.duration` |
+| Connection metrics | Available | `okhttp3.connections.started/end/failed/duration/acquired/released` |
+| Request metrics | Available | `okhttp3.requests.headers.*` / `requests.body.*` / `requests.failed` / `requests.body.bytes` |
+| Response metrics | Available | `okhttp3.responses.headers.*` / `responses.body.*` / `responses.failed` |
+| Call timeout counter | Available | `okhttp3.call.timeout.count` |
+| Cache metrics | Available | `OkHttpCacheMetrics` |
+| Dispatcher metrics | Available | `OkHttpDispatcherMetrics` |
+| Metrics interceptor | Available | `InstrumentedInterceptor(registry, tags)` for `OkHttpClient.Builder.addInterceptor(...)` |
+| Spring Boot auto-configuration | Not included | See the separate `okhttp3-spring-boot-starter` |
+
+Metric name prefixes are declared in `OkHttp3Metrics` (`okhttp3`, `okhttp3.requests`, `okhttp3.pool`) and `MetricNames`.
+
+<a id="3-requirements--compatibility"></a>
+## 3. Requirements & Compatibility
+
+| Component | Version | Notes |
+|---|---:|---|
+| JDK | 17+ | 1.0.x line baseline |
+| OkHttp | 4.12.0 | Instrumented target |
+| Micrometer core + observation | 1.10.6 | Meter primitives |
+| SLF4J | 2.0.18 | Logging facade |
+
+Version-line matrix:
+
+| Version line | Branch | JDK | Version pattern | Purpose |
+|---|---|---:|---|---|
+| 1.0.x | `feature/2.0.x` (this branch) | 8 | `1.0.x.*` | For Boot 2.x starters and legacy projects |
+| 2.0.x | `feature/2.0.x` | 17 | `2.0.x.*` | For Boot 3.x starters |
+| 3.0.x | `feature/3.0.x` | 21 | `3.0.x.*` | For Boot 4.x starters / new projects |
+
+<a id="4-architecture--modules"></a>
+## 4. Architecture & Modules
+
+```text
+[ OkHttpClient (4.12.0) ]
+        |
+        | InstrumentedEventListener (EventListener)
+        | InstrumentedInterceptor (Interceptor)
+        v
++------------------------------------------+
+| OkHttp3Metrics (MeterBinder)              |
+|  okhttp3.calls.* / requests.* /           |
+|  responses.* / dns.* / connections.*      |
+| OkHttpCacheMetrics     cache hits/puts    |
+| OkHttpDispatcherMetrics  queued/running   |
++------------------------------------------+
+        |
+        v
+[ Micrometer MeterRegistry ] -> [ Prometheus / ... ]
+```
+
+Single-module library (packaging `jar`). Package layout (`okhttp3.metrics`):
+
+| Class | Responsibility |
+|---|---|
+| `OkHttp3Metrics` | Abstract `MeterBinder`; metric-name constants and binding contract |
+| `InstrumentedOkHttpClients` | Factory: build or wrap an `OkHttpClient` with instrumentation |
+| `InstrumentedEventListener` | `EventListener` capturing call lifecycle (DNS, connect, request, response, failure) |
+| `InstrumentedInterceptor` | `Interceptor` alternative for `addInterceptor(...)` wiring |
+| `NestedEventListener` | Composes multiple `EventListener`s |
+| `OkHttpCacheMetrics` / `OkHttpDispatcherMetrics` | Cache and dispatcher gauges/counters |
+| `MetricNames` / `UrlMapperEnum` | Name building helpers and URL-cardinality policy |
+| `OKhttp3MetricsSpecificTagHandler` | Tag handling helpers |
+
+<a id="5-installation"></a>
+## 5. Installation
+
+Maven:
+
+```xml
 <dependency>
-	<groupId>io.github.hiwepy</groupId>
-	<artifactId>okhttp3-metrics-prometheus</artifactId>
-	<version>${project.version}</version>
+    <groupId>io.github.easy4j</groupId>
+    <artifactId>okhttp3-metrics-prometheus</artifactId>
+    <version>2.0.x.x.20260630-SNAPSHOT</version>
 </dependency>
 ```
 
-##### 2、在`application.yml`文件中增加如下配置
+Gradle:
 
-```yaml
-################################################################################################################
-###okhttp3基本配置：
-################################################################################################################
-okhttp3:
-  # okhttp3 的 metrics 配置
-  metrics:
-    # 是否在监控指标中包含host标签
-    include-host: true
+```groovy
+implementation 'io.github.easy4j:okhttp3-metrics-prometheus:2.0.x.x.20260630-SNAPSHOT'
 ```
 
+Snapshot builds require an enabled snapshot repository (Aliyun Maven snapshot repository per `distributionManagement` in `pom.xml`).
 
-##### 2、使用示例
+<a id="6-quick-start"></a>
+## 6. Quick Start
 
-访问本地配置：
+```java
+MeterRegistry registry = new SimpleMeterRegistry();
 
-http://localhost:8080/actuator/prometheus
+// Build a brand-new instrumented client (no Spring involved)
+OkHttpClient client = InstrumentedOkHttpClients.create(registry);
 
-```
-# HELP okhttp3_pool_dispatcher_running_calls_count Total number of running calls 
-# TYPE okhttp3_pool_dispatcher_running_calls_count gauge
-okhttp3_pool_dispatcher_running_calls_count{application="app-test",} 1.0
-# HELP okhttp3_pool_dispatcher_queued_calls_count Total number of queued calls 
-# TYPE okhttp3_pool_dispatcher_queued_calls_count gauge
-okhttp3_pool_dispatcher_queued_calls_count{application="app-test",} 0.0
-# HELP okhttp3_pool_dispatcher_max_requests_perhost_total max requests of dispatcher by per host 
-# TYPE okhttp3_pool_dispatcher_max_requests_perhost_total counter
-okhttp3_pool_dispatcher_max_requests_perhost_total{application="app-test",} 5.0
-# HELP okhttp3_network_requests_completed_total  
-# TYPE okhttp3_network_requests_completed_total counter
-okhttp3_network_requests_completed_total{application="app-test",} 410.0
-# HELP okhttp3_requests_body_bytes_max  
-# TYPE okhttp3_requests_body_bytes_max gauge
-okhttp3_requests_body_bytes_max{application="app-test",} 0.0
-# HELP okhttp3_requests_body_bytes  
-# TYPE okhttp3_requests_body_bytes summary
-okhttp3_requests_body_bytes_count{application="app-test",} 0.0
-okhttp3_requests_body_bytes_sum{application="app-test",} 0.0
-# HELP okhttp3_connections_started_total  
-# TYPE okhttp3_connections_started_total counter
-okhttp3_connections_started_total{application="app-test",} 4.0
-# HELP okhttp3_connections_released_total  
-# TYPE okhttp3_connections_released_total counter
-okhttp3_connections_released_total{application="app-test",} 410.0
-# HELP okhttp3_responses_failed_total  
-# TYPE okhttp3_responses_failed_total counter
-okhttp3_responses_failed_total{application="app-test",} 0.0
-# HELP okhttp3_responses_headers_end_total  
-# TYPE okhttp3_responses_headers_end_total counter
-okhttp3_responses_headers_end_total{application="app-test",} 410.0
-# HELP okhttp3_requests_body_started_total  
-# TYPE okhttp3_requests_body_started_total counter
-okhttp3_requests_body_started_total{application="app-test",} 0.0
-# HELP okhttp3_connections_end_total  
-# TYPE okhttp3_connections_end_total counter
-okhttp3_connections_end_total{application="app-test",} 4.0
-# HELP okhttp3_dns_duration_seconds  
-# TYPE okhttp3_dns_duration_seconds summary
-okhttp3_dns_duration_seconds_count{application="app-test",} 0.0
-okhttp3_dns_duration_seconds_sum{application="app-test",} 0.0
-# HELP okhttp3_dns_duration_seconds_max  
-# TYPE okhttp3_dns_duration_seconds_max gauge
-okhttp3_dns_duration_seconds_max{application="app-test",} 0.0
-# HELP okhttp3_requests_failed_total  
-# TYPE okhttp3_requests_failed_total counter
-okhttp3_requests_failed_total{application="app-test",} 0.0
-# HELP okhttp3_pool_dispatcher_max_requests_total max requests of dispatcher 
-# TYPE okhttp3_pool_dispatcher_max_requests_total counter
-okhttp3_pool_dispatcher_max_requests_total{application="app-test",} 64.0
-# HELP okhttp3_connections_acquired_total  
-# TYPE okhttp3_connections_acquired_total counter
-okhttp3_connections_acquired_total{application="app-test",} 410.0
-# HELP okhttp3_calls_failed_total  
-# TYPE okhttp3_calls_failed_total counter
-okhttp3_calls_failed_total{application="app-test",} 0.0
-# HELP okhttp3_pool_connection_count_connections The state of connections in the OkHttp connection pool
-# TYPE okhttp3_pool_connection_count_connections gauge
-okhttp3_pool_connection_count_connections{application="app-test",state="active",} 0.0
-okhttp3_pool_connection_count_connections{application="app-test",state="idle",} 2.0
-# HELP okhttp3_dns_end_total  
-# TYPE okhttp3_dns_end_total counter
-okhttp3_dns_end_total{application="app-test",} 4.0
-# HELP okhttp3_connections_failed_total  
-# TYPE okhttp3_connections_failed_total counter
-okhttp3_connections_failed_total{application="app-test",} 0.0
-# HELP okhttp3_requests_seconds_max Timer of OkHttp operation
-# TYPE okhttp3_requests_seconds_max gauge
-okhttp3_requests_seconds_max{application="app-test",method="GET",status="302",target_host="baidu.com",target_port="443",target_scheme="https",uri="/",} 0.4752953
-# HELP okhttp3_requests_seconds Timer of OkHttp operation
-# TYPE okhttp3_requests_seconds summary
-okhttp3_requests_seconds_count{application="app-test",method="GET",status="302",target_host="baidu.com",target_port="443",target_scheme="https",uri="/",} 205.0
-okhttp3_requests_seconds_sum{application="app-test",method="GET",status="302",target_host="baidu.com",target_port="443",target_scheme="https",uri="/",} 8.9529481
-# HELP okhttp3_calls_duration_seconds  
-# TYPE okhttp3_calls_duration_seconds summary
-okhttp3_calls_duration_seconds_count{application="app-test",} 0.0
-okhttp3_calls_duration_seconds_sum{application="app-test",} 0.0
-# HELP okhttp3_calls_duration_seconds_max  
-# TYPE okhttp3_calls_duration_seconds_max gauge
-okhttp3_calls_duration_seconds_max{application="app-test",} 0.0
-# HELP okhttp3_responses_body_bytes_max  
-# TYPE okhttp3_responses_body_bytes_max gauge
-okhttp3_responses_body_bytes_max{application="app-test",} 1142.0
-# HELP okhttp3_responses_body_bytes  
-# TYPE okhttp3_responses_body_bytes summary
-okhttp3_responses_body_bytes_count{application="app-test",} 410.0
-okhttp3_responses_body_bytes_sum{application="app-test",} 234110.0
-# HELP okhttp3_responses_body_end_total  
-# TYPE okhttp3_responses_body_end_total counter
-okhttp3_responses_body_end_total{application="app-test",} 410.0
-# HELP okhttp3_calls_started_total  
-# TYPE okhttp3_calls_started_total counter
-okhttp3_calls_started_total{application="app-test",} 205.0
-# HELP okhttp3_network_requests_submitted_total  
-# TYPE okhttp3_network_requests_submitted_total counter
-okhttp3_network_requests_submitted_total{application="app-test",} 431.0
-# HELP okhttp3_requests_body_end_total  
-# TYPE okhttp3_requests_body_end_total counter
-okhttp3_requests_body_end_total{application="app-test",} 0.0
-# HELP okhttp3_requests_headers_end_total  
-# TYPE okhttp3_requests_headers_end_total counter
-okhttp3_requests_headers_end_total{application="app-test",} 431.0
-# HELP okhttp3_requests_headers_started_total  
-# TYPE okhttp3_requests_headers_started_total counter
-okhttp3_requests_headers_started_total{application="app-test",} 434.0
-# HELP okhttp3_responses_headers_started_total  
-# TYPE okhttp3_responses_headers_started_total counter
-okhttp3_responses_headers_started_total{application="app-test",} 434.0
-# HELP okhttp3_responses_body_started_total  
-# TYPE okhttp3_responses_body_started_total counter
-okhttp3_responses_body_started_total{application="app-test",} 433.0
-# HELP okhttp3_network_requests_duration_seconds  
-# TYPE okhttp3_network_requests_duration_seconds histogram
-okhttp3_network_requests_duration_seconds{application="app-test",quantile="0.5",} 0.031981568
-okhttp3_network_requests_duration_seconds{application="app-test",quantile="0.75",} 0.041418752
-okhttp3_network_requests_duration_seconds{application="app-test",quantile="0.95",} 0.047710208
-okhttp3_network_requests_duration_seconds{application="app-test",quantile="0.98",} 0.051904512
-okhttp3_network_requests_duration_seconds{application="app-test",quantile="0.99",} 0.056098816
-okhttp3_network_requests_duration_seconds{application="app-test",quantile="0.999",} 0.318242816
-okhttp3_network_requests_duration_seconds_bucket{application="app-test",le="0.1",} 432.0
-okhttp3_network_requests_duration_seconds_bucket{application="app-test",le="+Inf",} 433.0
-okhttp3_network_requests_duration_seconds_count{application="app-test",} 433.0
-okhttp3_network_requests_duration_seconds_sum{application="app-test",} 11.691
-# HELP okhttp3_network_requests_duration_seconds_max  
-# TYPE okhttp3_network_requests_duration_seconds_max gauge
-okhttp3_network_requests_duration_seconds_max{application="app-test",} 0.307
-# HELP okhttp3_connections_duration_seconds  
-# TYPE okhttp3_connections_duration_seconds summary
-okhttp3_connections_duration_seconds_count{application="app-test",} 0.0
-okhttp3_connections_duration_seconds_sum{application="app-test",} 0.0
-# HELP okhttp3_connections_duration_seconds_max  
-# TYPE okhttp3_connections_duration_seconds_max gauge
-okhttp3_connections_duration_seconds_max{application="app-test",} 0.0
-# HELP okhttp3_network_requests_running_total  
-# TYPE okhttp3_network_requests_running_total counter
-okhttp3_network_requests_running_total{application="app-test",} 434.0
-# HELP okhttp3_calls_end_total  
-# TYPE okhttp3_calls_end_total counter
-okhttp3_calls_end_total{application="app-test",} 216.0
-# HELP okhttp3_dns_started_total  
-# TYPE okhttp3_dns_started_total counter
-okhttp3_dns_started_total{application="app-test",} 4.0
+// Or instrument an existing client:
+// OkHttpClient client = InstrumentedOkHttpClients.create(registry, myExistingClient);
+
+String body = client.newCall(new Request.Builder()
+        .url("https://httpbin.org/get").build())
+        .execute().body().string();
 ```
 
-##### 3、Prometheus 集成
+**Expected result**: after the call, the registry contains meters such as `okhttp3.calls.started`, `okhttp3.calls.end`, `okhttp3.requests.headers.end` and `okhttp3.connections.acquired`; with the Prometheus registry and a scrape endpoint, they appear under the `okhttp3_*` metric family.
 
+<a id="7-configuration"></a>
+## 7. Configuration
 
-##### 4、Grafana 集成
+This is a pure Java library — no configuration properties. Instrumentation behavior is controlled through factory parameters:
 
-
-## Jeebiz 技术社区
-
-Jeebiz 技术社区 **微信公共号**、**小程序**，欢迎关注反馈意见和一起交流，关注公众号回复「Jeebiz」拉你入群。
-
-|公共号|小程序|
+| Parameter | Meaning |
 |---|---|
-| ![](https://raw.githubusercontent.com/hiwepy/static/main/images/qrcode_for_gh_1d965ea2dfd1_344.jpg)| ![](https://raw.githubusercontent.com/hiwepy/static/main/images/gh_09d7d00da63e_344.jpg)|
+| `MeterRegistry` | Where meters are bound (Prometheus, Simple, ...) |
+| `OkHttpClient` | Existing client to wrap (optional; a default is created) |
+| `UrlMapperEnum` | URL-to-tag mapping policy (default `ENCODED_PATH`) to control cardinality |
+| `includeHostTag` | Whether to add a `host` tag |
+| `extraTagMap` / `requestTagKeys` | Static and per-request extra tags |
+| `contextSpecificTags` | `BiFunction<Request, Response, KeyValue>` list for context tags |
+| `Collection<Tag>` | Tags passed to `InstrumentedInterceptor` |
+
+<a id="8-core-usage"></a>
+## 8. Core Usage
+
+### 8.1 Interceptor-based wiring
+
+```java
+OkHttpClient client = new OkHttpClient.Builder()
+        .addInterceptor(new InstrumentedInterceptor(registry,
+                List.of(Tag.of("app", "checkout"))))
+        .build();
+```
+
+### 8.2 Custom URL mapping
+
+```java
+// ENCODED_PATH keeps one series per encoded path; other strategies trade
+// cardinality for detail. See UrlMapperEnum for available policies.
+OkHttpClient client = InstrumentedOkHttpClients.create(
+        registry, baseClient, UrlMapperEnum.ENCODED_PATH, true);
+```
+
+<a id="9-testing--build"></a>
+## 9. Testing & Build
+
+```bash
+mvn clean verify
+```
+
+- The parent POM enforces Maven and JDK 8 baselines via `maven-enforcer-plugin`.
+- JaCoCo runs `prepare-agent`, `report` and `check` on the `verify` phase with a **90% line-coverage** rule (`haltOnFailure=false`).
+- Release packaging (`mvn -Prelease deploy`) attaches sources and javadoc jars, GPG-signs artifacts and is wired for Sonatype Central Publishing; plain `mvn deploy` routes SNAPSHOT/release artifacts to the Aliyun Maven repository per `distributionManagement`.
+- `scripts/render-branch-pom.py` regenerates the branch-specific `pom.xml` (JDK / dependency stack per version line).
+
+<a id="10-versioning--branches"></a>
+## 10. Versioning & Branches
+
+| Branch | Version pattern | JDK | Maintenance policy |
+|---|---|---|---|
+| `feature/1.0.x` (this branch) | `1.0.x.*` | 8 | Compatibility fixes and JDK-8-safe dependency upgrades only |
+| `feature/2.0.x` | `2.0.x.*` | 17 | JDK 17 line |
+| `feature/3.0.x` | `3.0.x.*` | 21 | JDK 21 line |
+
+<a id="11-contributing--license"></a>
+## 11. Contributing & License
+
+Contributions are welcome. Run `mvn clean verify` before opening a pull request and describe compatibility, testing and migration impact. This project is licensed under the [Apache License 2.0](LICENSE).
