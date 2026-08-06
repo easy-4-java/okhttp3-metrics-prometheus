@@ -5,7 +5,7 @@ import okhttp3.Request;
 import java.util.function.Function;
 
 /**
- * @author wandl
+ * @author [@Loong Wan](https://github.com/loong10k)
  */
 public enum UrlMapperEnum {
 
