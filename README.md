@@ -2,6 +2,8 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
+[![Java](https://img.shields.io/badge/Java-21-orange)](https://github.com/easy-4-java/okhttp3-metrics-prometheus) [![License](https://img.shields.io/badge/license-Apache%202.0-green)](./LICENSE)
+
 Pure Java OkHttp metrics module: Micrometer / Prometheus instrumentation for OkHttp calls, dispatcher and cache
 [简体中文](./README.zh-CN.md)
 

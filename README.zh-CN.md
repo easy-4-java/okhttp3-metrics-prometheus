@@ -2,6 +2,8 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
+[![Java](https://img.shields.io/badge/Java-21-orange)](https://github.com/easy-4-java/okhttp3-metrics-prometheus) [![License](https://img.shields.io/badge/license-Apache%202.0-green)](./LICENSE)
+
 纯 Java OkHttp 指标模块：面向 Micrometer / Prometheus 的调用、调度器与缓存埋点
 
 > **当前分支**：`feature/3.0.x`
