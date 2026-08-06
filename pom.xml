@@ -120,12 +120,12 @@
             <dependency>
                 <groupId>io.micrometer</groupId>
                 <artifactId>micrometer-core</artifactId>
-            </dependency>
+            <version>1.13.7</version></dependency>
             <!-- For Micrometer -->
             <dependency>
                 <groupId>io.micrometer</groupId>
                 <artifactId>micrometer-observation</artifactId>
-            </dependency>
+            <version>1.13.7</version></dependency>
         </dependencies>
     </dependencyManagement>
 
