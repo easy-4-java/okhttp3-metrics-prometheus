@@ -67,7 +67,10 @@
         <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
         <maven-central-publishing-plugin.version>0.11.0</maven-central-publishing-plugin.version>
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
-    </properties>
+    
+		<junit.version>4.13.2</junit.version>
+		<junit-jupiter.version>6.1.0</junit-jupiter.version>
+		<commons-lang.version>2.6</commons-lang.version></properties>
 
     <!-- 依赖版本统一管理（dependencyManagement） -->
     <dependencyManagement>
@@ -104,17 +107,17 @@
             <dependency>
                 <groupId>com.squareup.okhttp3</groupId>
                 <artifactId>okhttp</artifactId>
-            <version>4.9.3</version></dependency>
+            <version>${okhttp.version}</version></dependency>
             <!-- For Micrometer -->
             <dependency>
                 <groupId>io.micrometer</groupId>
                 <artifactId>micrometer-core</artifactId>
-            <version>1.13.7</version></dependency>
+            <version>${micrometer.version}</version></dependency>
             <!-- For Micrometer -->
             <dependency>
                 <groupId>io.micrometer</groupId>
                 <artifactId>micrometer-observation</artifactId>
-            <version>1.13.7</version></dependency>
+            <version>${micrometer.version}</version></dependency>
         </dependencies>
     </dependencyManagement>
 
