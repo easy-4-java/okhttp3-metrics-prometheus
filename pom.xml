@@ -5,7 +5,7 @@
     <artifactId>okhttp3-metrics-prometheus</artifactId>
     <name>${project.groupId}:${project.artifactId}</name>
     <url>https://github.com/easy-4-java/${project.artifactId}</url>
-    <version>3.0.x-SNAPSHOT</version>
+    <version>3.0.x.20260630-SNAPSHOT</version>
     <packaging>jar</packaging>
     <description>OkHttp3 Metrics for Prometheus - independent of Spring Boot</description>
 
