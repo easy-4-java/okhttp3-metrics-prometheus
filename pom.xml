@@ -48,7 +48,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <okhttp.version>5.4.0</okhttp.version>
-        <micrometer.version>1.15.0-M3</micrometer.version>
+        <micrometer.version>1.15.4</micrometer.version>
         <slf4j.version>2.0.18</slf4j.version>
         <lombok.version>1.18.46</lombok.version>
         <maven.version>3.0</maven.version>
@@ -79,7 +79,7 @@
             <dependency>
                 <groupId>io.micrometer</groupId>
                 <artifactId>micrometer-bom</artifactId>
-                <version>1.15.4</version>
+                <version>${micrometer.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -112,12 +112,12 @@
             <dependency>
                 <groupId>io.micrometer</groupId>
                 <artifactId>micrometer-core</artifactId>
-            <version>1.10.4</version></dependency>
+            <version>${micrometer.version}</version></dependency>
             <!-- For Micrometer -->
             <dependency>
                 <groupId>io.micrometer</groupId>
                 <artifactId>micrometer-observation</artifactId>
-            <version>1.16.1</version></dependency>
+            <version>${micrometer.version}</version></dependency>
         </dependencies>
     </dependencyManagement>
 
